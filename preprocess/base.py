@@ -12,8 +12,17 @@ class BasePreprocessor(abc.ABC):
         """Yield (sample_id, tensor) pairs for this modality."""
 
     @torch.inference_mode()
-    def encode_and_save(self, root: pathlib.Path, out: pathlib.Path):
-        out.mkdir(parents=True, exist_ok=True)
-        for sid, x in self.iter_samples(root):
-            emb = self.model(x.to(self.device)).cpu().numpy()
-            np.save(out / f"{sid}.npy", emb)
+    def encode_and_save(self, paths: List[str], out_file: Path):
+        """
+        Encode every sample in `paths` and store **one** .npy file:
+            {"ids": [id₁, id₂, …], "emb": (N, D) array}
+        """
+        feats, ids = [], []
+        for sid, x in self.iter_samples(paths):
+            vec = self.model(x.to(self.device)).cpu().numpy()  # (1, D)
+            feats.append(vec.squeeze())                        # → (D,)
+            ids.append(sid)
+
+        emb_matrix = np.stack(feats)                           # (N, D)
+        np.save(out_file, {"ids": ids, "emb": emb_matrix})
+
