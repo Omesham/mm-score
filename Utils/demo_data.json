@@ -1,0 +1,31 @@
+[
+  {
+    "id": 1,
+    "text": "A cat sits on a mat",
+    "image": "cat.jpg",
+    "timestamp": "0:05"
+  },
+  {
+    "id": 2,
+    "text": "Dog running in park",
+    "video": "dog.mp4",
+    "timestamp": "0:10"
+  },
+  {
+    "id": 3,
+    "text": "Bird flying high",
+    "image": "bird.jpg"
+  },
+  {
+    "id": 4,
+    "question": "What color is the sky?",
+    "answer": "blue",
+    "image": "sky.jpg"
+  },
+  {
+    "id": 5,
+    "text": "Car driving fast",
+    "video": "car.mp4",
+    "audio": "engine.wav"
+  }
+]
