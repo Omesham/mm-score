@@ -1,0 +1,36 @@
+# Comprehensive test with ALL working datasets
+modalities:
+  # Text modality
+  tvqa_text:
+    type: "text"
+    path: "./multimodal_datasets/TVQA/tvqa_val.jsonl"
+    max_items: 10
+    
+  # Audio modality  
+  ave_audio:
+    type: "audio"
+    path: "./multimodal_datasets/AVE/AVE-ECCV18-master/data/audio_feature_noisy.h5"
+    max_items: 10
+    
+  # Visual modality
+  ave_visual:
+    type: "video"
+    path: "./multimodal_datasets/AVE/AVE-ECCV18-master/model/AV_att_weak.pt"
+    max_items: 10
+    
+  # Sensor modality
+  opportunity_sensors:
+    type: "sensor"
+    path: "./multimodal_datasets/Opportunity/OpportunityUCIDataset/dataset/S2-ADL1.dat"
+    max_items: 100
+
+evaluation:
+  metrics:
+    - alignment
+
+output:
+  save_path: "./outputs/comprehensive_test_results.json"
+  failed_log: "./outputs/comprehensive_failed_log.txt"
+
+general:
+  batch_size: 16

@@ -1,0 +1,52 @@
+# Universal MM-Score Configuration Template
+# Works with ANY multimodal dataset - just update paths and add modalities
+
+modalities:
+  # Text modalities (supports: json, jsonl, txt, csv)
+  text:
+    type: "text"
+    path: "./multimodal_datasets/TVQA/tvqa_val.jsonl"
+    format: "jsonl"
+    max_items: 100  # Limit for testing
+    
+  # Audio modalities (supports: h5, npy, wav, mp3)
+  audio:
+    type: "audio"
+    path: "./multimodal_datasets/AVE/AVE-ECCV18-master/data/audio_feature_noisy.h5"
+    format: "h5"
+    sample_rate: 16000
+    
+  # Video modalities (supports: pt, h5, npy, mp4, avi)
+  # video:
+  #   type: "video"
+  #   path: "./multimodal_datasets/YOUR_DATASET/video_features.pt"
+  #   format: "pytorch"
+  #   fps: 25
+    
+  # Image modalities (supports: h5, npy, directories of jpg/png)
+  # image:
+  #   type: "image" 
+  #   path: "./multimodal_datasets/YOUR_DATASET/images/"
+  #   format: "directory"
+    
+  # Sensor modalities (supports: h5, csv, npy)
+  # sensor_eye:
+  #   type: "sensor"
+  #   path: "./multimodal_datasets/YOUR_DATASET/eye_tracking.csv"
+  #   format: "csv"
+  #   sample_rate: 60
+
+evaluation:
+  metrics:
+    - alignment    # Your cross-correlation temporal alignment
+    - noise       # Data quality assessment
+    - imbalance   # Modality balance analysis
+
+output:
+  save_path: "./outputs/mm_score_results.json"
+  failed_log: "./outputs/failed_log.txt"
+
+general:
+  batch_size: 32        # Adjust based on memory
+  subset: null          # For full dataset evaluation
+  device: "auto"        # auto-detect GPU/CPU

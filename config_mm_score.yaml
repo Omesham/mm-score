@@ -1,0 +1,162 @@
+# Universal MM-Score Configuration
+# Works with ANY multimodal dataset - just specify the dataset path at runtime
+# 
+# Usage Examples:
+#   python mm_score_main.py --config universal_config.yaml --dataset ./MSCOCO/
+#   python mm_score_main.py --config universal_config.yaml --dataset ./multimodal_datasets/TVQA/
+#   python mm_score_main.py --config universal_config.yaml --dataset ./any_dataset/
+
+# UNIVERSAL MODALITY DETECTION
+# System will auto-detect all available modalities in any dataset
+modalities:
+  # Auto-detection mode - no specific paths needed
+  auto_detect: true
+  
+  # Optional: Limit which modalities to evaluate (leave empty for all)
+  # include_only: ["video", "audio"]  # Uncomment to limit modalities
+  # exclude: ["sensor"]               # Uncomment to exclude specific modalities
+
+# COMPREHENSIVE EVALUATION SETTINGS
+evaluation:
+  # All evaluation metrics (your research contributions)
+  metrics:
+    - alignment    # Cross-correlation temporal + CLIP semantic alignment
+    - noise       # Statistical outlier detection + quality assessment
+    - imbalance   # Count ratios + distribution analysis
+  
+  # Research-grade evaluation weights (based on your paper)
+  weights:
+    alignment: 0.5    # 50% - Most critical for multimodal AI training
+    noise: 0.3       # 30% - Data quality affects model performance  
+    imbalance: 0.2   # 20% - Balance issues cause training bias
+  
+  # Flexible sample size (override with --max-items)
+  max_items: null              # null = use all data, or set number for testing
+  
+  # Advanced evaluation parameters
+  temporal_window: 0.5         # Seconds for temporal alignment analysis
+  noise_threshold: 2.0         # Standard deviations for outlier detection
+  semantic_similarity_model: "CLIP"  # Model for image-text alignment
+  
+  # Multi-modal evaluation settings
+  cross_modal_validation: true    # Enable 3+ modality advanced analysis
+  information_architecture: true # Analyze information distribution
+
+# SMART OUTPUT CONFIGURATION  
+output:
+  # Dynamic output paths (will be created automatically)
+  save_path: "./outputs/mm_score_results_{timestamp}.json"
+  failed_log: "./outputs/failed_log_{timestamp}.txt"
+  config_backup: "./outputs/config_backup_{timestamp}.yaml"
+  
+  # Enhanced output features
+  detailed_results: true       # Include all component scores
+  save_config: true           # Save exact config used for reproducibility
+  format: "json"              # Output format
+  include_debug: false        # Set true for debugging
+  
+  # Research-grade reporting
+  methodology_report: true    # Include evaluation methodology  
+  reproducibility_info: true # Include all parameters for replication
+
+# PERFORMANCE & PROCESSING
+general:
+  # Smart processing settings
+  batch_size: 32              # Adjust based on memory
+  parallel_processing: true   # Enable multi-threading
+  memory_efficient: true      # Optimize for large datasets
+  
+  # Hardware settings
+  device: "auto"              # Auto-detect GPU/CPU
+  max_memory_gb: null         # null = auto, or set limit
+  
+  # Reproducibility
+  random_seed: 42             # For consistent results
+  deterministic: true         # Ensure reproducible evaluation
+
+# RESEARCH METHODOLOGY SETTINGS
+research:
+  # Academic publication settings
+  reproducible: true                    # Enable full reproducibility
+  methodology_logging: true             # Log all methodological decisions
+  citation_ready: true                  # Generate citation-ready results
+  
+  # Experimental design
+  controlled_evaluation: true           # Consistent parameters across datasets
+  statistical_significance: true       # Include confidence intervals
+  
+  # Quality standards
+  publication_grade: true               # Meet academic publication standards
+  peer_review_ready: true              # Include all required methodology details
+
+# ADVANCED FEATURES
+advanced:
+  # Multi-dataset comparison mode
+  comparison_mode: false               # Set true when comparing multiple datasets
+  baseline_normalization: false       # Normalize scores against baseline
+  
+  # Specialized evaluations
+  sensor_physiological_validation: true   # Validate sensor ranges (temp: 36-40°C, etc.)
+  cross_sensor_correlation: true          # Analyze sensor relationships
+  
+  # Performance optimizations
+  early_stopping: false               # Stop if severe quality issues detected
+  adaptive_sampling: false            # Adjust sample size based on dataset size
+  progressive_evaluation: false       # Start small, increase if needed
+
+# MODALITY-SPECIFIC SETTINGS (Applied when detected)
+modality_settings:
+  video:
+    frame_extraction: true             # Extract frames for analysis
+    temporal_resolution: "auto"        # Auto-detect or set FPS
+    quality_thresholds:
+      min_resolution: [224, 224]       # Minimum acceptable resolution
+      max_compression: 0.8             # Maximum compression artifact threshold
+  
+  audio:
+    waveform_extraction: true          # Extract waveforms for analysis
+    sample_rate: "auto"               # Auto-detect or set sample rate
+    quality_thresholds:
+      min_duration: 0.1               # Minimum audio duration (seconds)
+      max_noise_level: 0.3            # Maximum background noise threshold
+  
+  text:
+    encoding_validation: true          # Check text encoding quality
+    language_detection: true           # Detect and validate language
+    quality_thresholds:
+      min_length: 1                   # Minimum text length
+      max_gibberish: 0.1              # Maximum gibberish ratio
+  
+  image:
+    quality_assessment: true           # Assess image quality
+    format_validation: true            # Validate image formats
+    quality_thresholds:
+      min_resolution: [224, 224]       # Minimum acceptable resolution
+      max_artifacts: 0.2              # Maximum artifact threshold
+  
+  sensor:
+    physiological_validation: true     # Validate against normal ranges
+    temporal_consistency: true         # Check sampling rate consistency
+    cross_validation: true            # Validate across multiple sensors
+
+# EVALUATION ROUTING (Automatic)
+# System automatically selects appropriate evaluations based on detected modalities:
+# 
+# Video + Audio → Temporal alignment (cross-correlation) + noise + imbalance
+# Text + Image → Semantic alignment (CLIP) + noise + imbalance  
+# Video + Text → Temporal-semantic alignment + noise + imbalance
+# Audio + Text → Speech-text alignment + noise + imbalance
+# Sensor only → Signal quality + noise + imbalance + physiological validation
+# 3+ modalities → All above + cross-modal validation + information architecture
+#
+# Your novel cross-correlation algorithm is automatically used for temporal modalities!
+
+# RESEARCH NOTES
+# This configuration implements the MM-Score framework with:
+# 1. Your novel cross-correlation temporal alignment contribution
+# 2. CLIP-based semantic alignment for modern multimodal evaluation  
+# 3. Comprehensive noise detection (statistical + domain-specific)
+# 4. Multi-level imbalance analysis (quantity + quality + temporal)
+# 5. Research-grade reproducibility and methodology tracking
+#
+# Simply specify any dataset and the system handles the rest!

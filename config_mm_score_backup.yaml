@@ -1,0 +1,58 @@
+modalities:
+  video:
+    type: "video"
+    path: "./data/video/"
+    fps: 25
+    
+  image:                
+    type: image
+    path: "${PWD}/MSCOCO/train2017"
+    
+  audio:
+    type: "audio"
+    path: "./data/audio/"
+    sample_rate: 16000
+
+  text:
+    type: "text"
+    path: "${PWD}/MSCOCO/annotations/captions_train2017.json"
+    format: "json"
+
+  sensor_eye:
+    type: "sensor"
+    path: "./data/sensor/eye/"
+    sample_rate: 60
+
+  sensor_brain:
+    type: "sensor"
+    path: "./data/sensor/brain/"
+    sample_rate: 250
+
+  sensor_body:
+    type: "sensor"
+    path: "./data/sensor/body/"
+    sample_rate: 50
+
+  sensor_heart:
+    type: "sensor"
+    path: "./data/sensor/heart/"
+    sample_rate: 100
+
+  sensor_temperature:
+    type: "sensor"
+    path: "./data/sensor/temperature/"
+    sample_rate: 1
+
+evaluation:
+  metrics:
+    - alignment
+    - noise
+    - imbalance
+
+output:
+  save_path: "./outputs/mm_score_results.json"
+  failed_log: "./outputs/failed_log.txt"
+
+general:
+  batch_size: 64
+  subset: null
