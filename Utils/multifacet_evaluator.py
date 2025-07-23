@@ -19,10 +19,10 @@ class SimpleMultiFacetEvaluator:
         try:
             with open(filename, 'r') as f:
                 self.data = json.load(f)
-            print(f"✅ Loaded {len(self.data)} items from {filename}")
+            print(f"Loaded {len(self.data)} items from {filename}")
             return True
         except Exception as e:
-            print(f"❌ Error loading {filename}: {e}")
+            print(f" Error loading {filename}: {e}")
             return False
 
     def evaluate_alignment(self):
@@ -303,7 +303,7 @@ class SimpleMultiFacetEvaluator:
     def _generate_report(self):
         """Generate comprehensive quality report"""
         print("\n" + "=" * 60)
-        print("📊 QUALITY ASSESSMENT REPORT")
+        print(" QUALITY ASSESSMENT REPORT")
         print("=" * 60)
 
         dimensions = ['alignment', 'noise', 'imbalance']
@@ -311,7 +311,7 @@ class SimpleMultiFacetEvaluator:
 
         # Print detailed scores
         for dim in dimensions:
-            print(f"\n🎯 {dim.upper()} DIMENSION:")
+            print(f"\n {dim.upper()} DIMENSION:")
             print("-" * 40)
 
             total_score = 0
@@ -333,18 +333,18 @@ class SimpleMultiFacetEvaluator:
 
         overall_quality = sum(overall_scores) / len(overall_scores)
 
-        print(f"\n🏆 OVERALL QUALITY SCORE: {overall_quality:.3f}")
+        print(f"\n OVERALL QUALITY SCORE: {overall_quality:.3f}")
 
         # Recommendations
-        print("\n💡 RECOMMENDATIONS:")
+        print("\n RECOMMENDATIONS:")
         print("-" * 40)
 
         if overall_quality >= 0.8:
-            print("✅ High quality dataset - suitable for production use")
+            print(" High quality dataset - suitable for production use")
         elif overall_quality >= 0.6:
-            print("⚠️ Medium quality - consider improvements before use")
+            print(" Medium quality - consider improvements before use")
         else:
-            print("❌ Low quality - significant improvements needed")
+            print(" Low quality - significant improvements needed")
 
         print("1. Focus on lowest-scoring facets for maximum impact")
         print("2. Implement human validation studies where needed")
@@ -354,7 +354,7 @@ class SimpleMultiFacetEvaluator:
 # Demo usage
 def run_demo():
     """Run a demonstration of the multi-facet evaluator"""
-    print("🎉 Welcome to the Multi-Facet Quality Evaluator!")
+    print(" Welcome to the Multi-Facet Quality Evaluator!")
     print("This implements your 5-facet framework for dataset quality assessment.\n")
 
     # Create evaluator instance
