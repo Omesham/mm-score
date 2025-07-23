@@ -194,7 +194,7 @@ class EnhancedMMSCOREvaluator:
         except Exception as e:
             error_msg = f"Evaluation failed: {str(e)}"
             if verbose:
-                print(f"❌ {error_msg}")
+                print(f" {error_msg}")
                 import traceback
                 traceback.print_exc()
             return self._create_error_result(error_msg)
@@ -207,7 +207,7 @@ class EnhancedMMSCOREvaluator:
         emb_dir = Path("embeddings")
         if emb_dir.exists() and any(emb_dir.glob("*.npy")):
             if verbose:
-                print(f"📥 Loading cached embeddings from: {emb_dir}/")
+                print(f" Loading cached embeddings from: {emb_dir}/")
             from loaders import load_embeddings                     # helper we added
             return {
                 p.stem: load_embeddings(emb_dir, p.stem)
@@ -217,7 +217,7 @@ class EnhancedMMSCOREvaluator:
         # ── legacy paths (raw files) ─────────────────────────────
         if 'dynamic_dataset' in self.config:                       # CLI override
             if verbose:
-                print(f"🔍 Smart loading raw data from: {self.config['dynamic_dataset']}")
+                print(f" Smart loading raw data from: {self.config['dynamic_dataset']}")
             return smart_load_dataset(
                 dataset_path=self.config['dynamic_dataset'],
                 modalities=self.config.get('dynamic_modalities'),
@@ -225,7 +225,7 @@ class EnhancedMMSCOREvaluator:
             )
         else:                                                      # YAML
             if verbose:
-                print("📄 Traditional raw‑data loading from YAML configuration")
+                print(" Traditional raw‑data loading from YAML configuration")
             return load_modalities(self.config["modalities"])
 
 
@@ -236,11 +236,11 @@ class EnhancedMMSCOREvaluator:
         self.metrics = [get_metric(name)(self.config) for name in metric_names]
         
         if verbose:
-            print(f"✅ Initialized {len(self.metrics)} metrics: {metric_names}")
+            print(f"Initialized {len(self.metrics)} metrics: {metric_names}")
             
             # Show research methodology
             weights = self.config["evaluation"]["weights"]
-            print(f"📊 Evaluation weights: Alignment={weights['alignment']}, "
+            print(f" Evaluation weights: Alignment={weights['alignment']}, "
                   f"Noise={weights['noise']}, Imbalance={weights['imbalance']}")
 
     def _run_evaluation(self, data: Dict[str, Any], verbose: bool) -> Dict[str, Any]:
@@ -251,7 +251,7 @@ class EnhancedMMSCOREvaluator:
         for metric in self.metrics:
             metric_name = metric.__class__.__name__
             if verbose:
-                print(f"🔄 Running {metric_name}...")
+                print(f" Running {metric_name}...")
             
             try:
                 metric_result = metric.evaluate(data)
@@ -259,11 +259,11 @@ class EnhancedMMSCOREvaluator:
                 
                 if verbose:
                     score = metric_result.get("mm_score_summary", {}).get("overall_score", "N/A")
-                    print(f"✅ {metric_name}: {score}")
+                    print(f"{metric_name}: {score}")
                     
             except Exception as e:
                 if verbose:
-                    print(f"⚠️ {metric_name} failed: {e}")
+                    print(f"{metric_name} failed: {e}")
                 results[metric_name] = {"error": str(e)}
         
         return results
@@ -274,7 +274,7 @@ class EnhancedMMSCOREvaluator:
         """Compile enhanced results with research metadata"""
         
         if verbose:
-            print("📋 Compiling comprehensive results...")
+            print("Compiling comprehensive results...")
         
         # Extract primary evaluation (assuming first metric is main one)
         primary_result = list(evaluation_results.values())[0] if evaluation_results else {}
@@ -357,11 +357,11 @@ class EnhancedMMSCOREvaluator:
                 json.dump(results, f, indent=2, default=str)
             
             if verbose:
-                print(f"💾 Results saved to: {output_file}")
+                print(f"Results saved to: {output_file}")
                 
         except Exception as e:
             if verbose:
-                print(f"⚠️ Failed to save results: {e}")
+                print(f"Failed to save results: {e}")
 
     def _save_config(self, config_file: str, verbose: bool):
         """Save current configuration for reproducibility"""
@@ -370,20 +370,20 @@ class EnhancedMMSCOREvaluator:
                 yaml.dump(self.config, f, default_flow_style=False)
             
             if verbose:
-                print(f"📄 Configuration saved to: {config_file}")
+                print(f"Configuration saved to: {config_file}")
                 
         except Exception as e:
             if verbose:
-                print(f"⚠️ Failed to save config: {e}")
+                print(f"Failed to save config: {e}")
 
     def _print_research_header(self):
         """Print research-grade header"""
         print("=" * 80)
-        print(f"🔬 {self.framework_name} v{self.version}")
+        print(f" {self.framework_name} v{self.version}")
         print("=" * 80)
-        print("📊 Research-Grade Multimodal Dataset Evaluation Framework")
-        print("🎯 Novel Cross-Correlation Temporal Alignment + Comprehensive Assessment")
-        print("🔬 Academic Publication Ready • Reproducible Research Methodology")
+        print(" Research-Grade Multimodal Dataset Evaluation Framework")
+        print(" Novel Cross-Correlation Temporal Alignment + Comprehensive Assessment")
+        print(" Academic Publication Ready • Reproducible Research Methodology")
         print("=" * 80)
 
     def _print_enhanced_summary(self, results: Dict[str, Any]):
@@ -396,43 +396,43 @@ class EnhancedMMSCOREvaluator:
         metadata = results.get("research_metadata", {})
         
         print("\n" + "=" * 80)
-        print("🎯 ENHANCED MM-SCORE RESEARCH SUMMARY")
+        print("ENHANCED MM-SCORE RESEARCH SUMMARY")
         print("=" * 80)
         
         # Core Results
-        print(f"📊 Overall Score: {summary.get('overall_score', 0.0):.3f} ({summary.get('overall_grade', 'UNKNOWN')})")
-        print(f"🔬 Research Ready: {'✅ YES' if summary.get('research_ready', False) else '❌ NO'}")
-        print(f"📖 Publication Status: {summary.get('publication_readiness', 'Unknown')}")
+        print(f"Overall Score: {summary.get('overall_score', 0.0):.3f} ({summary.get('overall_grade', 'UNKNOWN')})")
+        print(f"Research Ready: {'YES' if summary.get('research_ready', False) else '❌ NO'}")
+        print(f"Publication Status: {summary.get('publication_readiness', 'Unknown')}")
         
         # Component Breakdown
         components = summary.get('component_scores', {})
         if components:
-            print(f"\n📋 Component Analysis:")
+            print(f"\nComponent Analysis:")
             for component, score in components.items():
                 print(f"   {component.title()}: {score:.3f}")
         
         # Research Metadata
         methodology = metadata.get('methodology', {})
-        print(f"\n🔬 Research Methodology:")
+        print(f"\n Research Methodology:")
         print(f"   Evaluation Weights: {methodology.get('evaluation_weights', {})}")
         print(f"   Metrics Used: {methodology.get('metrics_used', [])}")
         print(f"   Reproducible: {methodology.get('reproducible', False)}")
         
         # Data Information
         data_info = metadata.get('data_info', {})
-        print(f"\n📊 Dataset Information:")
+        print(f"\n Dataset Information:")
         print(f"   Modalities: {', '.join(data_info.get('modalities_evaluated', []))}")
         print(f"   Total Samples: {data_info.get('total_samples', 0)}")
         
         # Recommendations
         actions = summary.get('recommended_actions', [])
         if actions:
-            print(f"\n💡 Research Recommendations:")
+            print(f"\n Research Recommendations:")
             for i, action in enumerate(actions, 1):
                 print(f"   {i}. {action}")
         
         print("\n" + "=" * 80)
-        print("✨ Enhanced MM-Score evaluation complete! Research-grade assessment ready.")
+        print(" Enhanced MM-Score evaluation complete! Research-grade assessment ready.")
         print("=" * 80)
 
     def _create_error_result(self, error_msg: str) -> Dict[str, Any]:
@@ -509,10 +509,10 @@ Research Examples:
     
     # Exit with appropriate code
     if results.get("success", False):
-        print(f"\n🎉 Research evaluation completed successfully!")
+        print(f"\n Research evaluation completed successfully!")
         sys.exit(0)
     else:
-        print(f"\n❌ Evaluation failed: {results.get('error', 'Unknown error')}")
+        print(f"\n Evaluation failed: {results.get('error', 'Unknown error')}")
         sys.exit(1)
 
 if __name__ == "__main__":
