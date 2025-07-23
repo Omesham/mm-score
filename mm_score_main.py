@@ -19,6 +19,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+from loaders import load_embeddings                     
 
 # Add current directory to Python path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
