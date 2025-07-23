@@ -13,12 +13,12 @@ from pathlib import Path
 # --- MM-SCORE imports -------------------------------------------------
 from loaders import UniversalDataLoader
 from preprocess.image  import ImagePreprocessor
-# (add VideoPreprocessor, AudioPreprocessor … when they exist)
+from preprocess.text import TextPreprocessor
 
 # Map modality names → preprocessor classes
 PREPROCESSORS = {
     "image": ImagePreprocessor,
-    # "video": VideoPreprocessor,
+    "text" : TextPreprocessor,
     # "audio": AudioPreprocessor,
     # "text" : TextPreprocessor,
     # "sensor": SensorPreprocessor,
