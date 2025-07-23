@@ -66,7 +66,7 @@ def main(args):
         pre = preproc_cls(device=args.device)
         pre.encode_and_save(paths, out_root / f"{modality}.npy")
 
-    print("\n✅  All done – embeddings saved in", out_root)
+    print("\n  All embeddings saved in", out_root)
 
 
 # ──────────────────────────────────────────────
