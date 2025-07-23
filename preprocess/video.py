@@ -9,7 +9,12 @@ from preprocess.base import BasePreprocessor
 
 class VideoPreprocessor(BasePreprocessor):
     def __init__(self, device="cuda"):
-        model = build_model("ViT-B-32", num_frames=16)     # 16‑frame ActionCLIP
+        # 32-frame ActionCLIP (shell + weights)
+        model, _ = clip.load("ViT-B/16", tsm=True, T=32, device=device, jit=False)
+        model.load_state_dict(torch.load(CKPT_PATH, map_location=device)
+                              .get("state_dict", torch.load(CKPT_PATH, map_location=device)),
+                              strict=False)
+        model.eval()
         load_checkpoint(model, "actionclip_vit_b_32.pth")
         super().__init__(model, device=device)
 
