@@ -1,5 +1,3 @@
-# Simple, Clean Output Version - Replace your alignment.py with this
-
 import os
 import json
 import numpy as np
