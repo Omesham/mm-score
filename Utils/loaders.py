@@ -660,3 +660,20 @@ def smart_load_dataset(dataset_path: str, modalities: List[str] = None, max_item
     
     print(f"[Smart Loader] Smart loading complete: {list(loaded_data.keys())}")
     return loaded_data
+
+
+# ────────────────────────────────────────────────────────────
+# Helper for MM‑SCORE pre‑computed features
+# Place this at the bottom of loader.py
+
+def load_embeddings(emb_dir: str | Path, modality: str):
+    """
+    Load the single .npy file produced by the pre‑processor.
+    Returns a dict: {"ids": [...], "emb": ndarray (N, D)}
+    """
+    from pathlib import Path
+    import numpy as np
+
+    file_path = Path(emb_dir) / f"{modality}.npy"
+    return np.load(file_path, allow_pickle=True).item()
+
