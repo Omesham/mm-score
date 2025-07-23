@@ -17,11 +17,11 @@ from preprocess.text import TextPreprocessor
 
 # Map modality names → preprocessor classes
 PREPROCESSORS = {
-    "image": ImagePreprocessor,
-    "text" : TextPreprocessor,
-    # "audio": AudioPreprocessor,
-    # "text" : TextPreprocessor,
-    # "sensor": SensorPreprocessor,
+    "image":  ImagePreprocessor,
+    "video":  VideoPreprocessor,
+    "audio":  AudioPreprocessor,
+    "text":   TextPreprocessor,
+    "sensor": SensorPreprocessor
 }
 
 # ---------------------------------------------------------------------
