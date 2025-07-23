@@ -26,7 +26,7 @@ class TextPreprocessor(CLIPPreprocessor):
 
 
 # ----------------------------------------------------------------------
-# Optional helper to run stand‑alone (same pattern as image.py)
+# Optional helper to run stand‑alone (same pattern as image.py) for quick sanity check/testing
 def run(dataset_root: str, out_dir: str, device="cuda"):
     from loaders import UniversalDataLoader
 
