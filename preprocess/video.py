@@ -1,65 +1,71 @@
 # preprocess/video.py
+"""
+ActionCLIP‑based video encoder
+Saves ONE   video.npy   with  {"ids": [...], "emb": (N, 512)}
+"""
+
 from pathlib import Path
-from typing import List, Iterable, Tuple
+from typing  import List, Iterable, Tuple
+import torch, torchvision
+import decord                          # pip install decord
+import clip                            # repo provides ActionCLIP wrapper too
 
-import torch
-from torchvision import transforms
-from decord import VideoReader, cpu
-from preprocess.base import BasePreprocessor
+from preprocess.base       import BasePreprocessor
+from preprocess.clip_base  import clip_preprocess          # reuse resize / crop
+from loaders               import UniversalDataLoader      # used only by run()
 
-# ---- ActionCLIP helpers -------------------------------------------------
-from actionclip_model import build_model, load_checkpoint   # <- repo utilities
-CKPT_PATH = "actionclip_vitb16_32f.pth"                    # adjust to your file
+# ---------------------------------------------------------------------------
+# 1) load ActionCLIP *once* at import time
+actionclip, _ = clip.load(
+    model_name      = "ViT-B/16",
+    device          = "cpu",          # moved to GPU in __init__
+    tsm             = True,           # enable temporal shift
+    T               = 32,             # frames per clip
+    jit             = False)
 
-# ─────────────────────────────────────────────────────────────────────────
+# weights (download separately – 335 MB) --------------------------
+#   wget https://link.to/actionclip_vit_b_32.pth -O weights/actionclip_vit_b_32.pth
+CKPT = Path("weights/actionclip_vit_b_32.pth")
+state_dict = torch.load(CKPT, map_location="cpu")
+actionclip.load_state_dict(state_dict.get("state_dict", state_dict), strict=False)
+actionclip.eval()
+
+# ---------------------------------------------------------------------------
 class VideoPreprocessor(BasePreprocessor):
     """
-    32‑frame ActionCLIP encoder → single .npy with {"ids":[], "emb":(N,D)}
+    1. uniformly sample 32 frames per file
+    2. feed to ActionCLIP → 512‑D global embedding
+    3. store everything in one .npy
     """
 
     def __init__(self, device: str = "cuda"):
-        # 1) build empty ActionCLIP (ViT‑B/16 backbone, 32 frames)
-        model = build_model(
-            base_encoder      = "ViT-B/16",
-            num_segments      = 32,
-            tsm               = True,      # temporal shift
-            drop_path_rate    = 0.0,
-            pretrained_clip   = False      # we’ll load weights next
-        )
+        super().__init__(actionclip, device=device)
+        self.resize = torchvision.transforms.Resize(224)
 
-        # 2) load official checkpoint
-        load_checkpoint(model, CKPT_PATH, strict=True)
+    # -------------- helpers -------------------------------------------------
+    def _sample_frames(self, vr, T=32):
+        idxs = torch.linspace(0, len(vr) - 1, T).long()
+        return vr.get_batch(idxs)          # (T, H, W, 3)  uint8
 
-        super().__init__(model, device=device)
-
-        # preprocessing – same as ActionCLIP training recipe
-        self.transform = transforms.Compose([
-            transforms.Resize(224),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),          # (C,H,W) in [0,1]
-            transforms.Normalize(
-                mean = [0.48145466, 0.4578275, 0.40821073],
-                std  = [0.26862954, 0.26130258, 0.27577711]
-            )
-        ])
-
-    # ------------------------------------------------------------------  
-    def _sample_frames(self, vr: VideoReader, num: int = 32) -> torch.Tensor:
-        """
-        Uniformly sample `num` frames -> Tensor (T, C, H, W)
-        """
-        idxs = torch.linspace(0, len(vr) - 1, num).long()
-        frames = vr.get_batch(idxs).permute(0, 3, 1, 2)  # T, C, H, W (RGB)
-        return frames.float() / 255.0                    # [0,1] float
-
+    # -------------- Base hook ----------------------------------------------
     def iter_samples(self, paths: List[str]) -> Iterable[Tuple[str, torch.Tensor]]:
-        """
-        Yield (video_id, tensor[1, T, C, H, W]) for each file.
-        The outer batch dim (1) keeps BasePreprocessor unchanged.
-        """
         for p in paths:
-            vr = VideoReader(p, ctx=cpu(0))
-            clip = self._sample_frames(vr)                      # T,C,H,W
-            clip = torch.stack([self.transform(f) for f in clip])
-            clip = clip.unsqueeze(0)                            # 1,T,C,H,W
-            yield Path(p).stem, clip
+            vr   = decord.VideoReader(p, width=256, height=256)
+            clip = self._sample_frames(vr)                         # (T,H,W,3)
+
+            # → (T,3,224,224) float32 in [0,1] with CLIP transform
+            clip = torch.stack([clip_preprocess(Image=self.resize(frame)) for frame in clip])
+            yield Path(p).stem, clip.unsqueeze(0)                  # add batch‑dim
+
+
+# ---------------------------------------------------------------------------
+def run(dataset_root: str, out_dir: str, device="cuda"):
+    """Quick CLI / notebook test: encode ONLY the videos under dataset_root."""
+    detected = UniversalDataLoader.auto_detect_modalities(dataset_root)
+    video_files = detected.get("video", [])
+    if not video_files:
+        print("[VideoPreproc] No videos found.")
+        return
+    pre = VideoPreprocessor(device=device)
+    pre.encode_and_save(video_files, Path(out_dir) / "video.npy")
+# ---------------------------------------------------------------------------
