@@ -198,30 +198,34 @@ class EnhancedMMSCOREvaluator:
                 traceback.print_exc()
             return self._create_error_result(error_msg)
 
-    def _load_data_intelligently(self, verbose: bool) -> Dict[str, Any]:
-        """Load data using smart detection or traditional config"""
-        
-        # Check for dynamic dataset specification
-        if 'dynamic_dataset' in self.config:
-            if verbose:
-                print(f"🔍 Smart loading from: {self.config['dynamic_dataset']}")
-            
-            modalities = self.config.get('dynamic_modalities')
-            max_items = self.config['evaluation'].get('max_items')
-            
-            return smart_load_dataset(
-                dataset_path=self.config['dynamic_dataset'],
-                modalities=modalities,
-                max_items=max_items
-            )
-        
-        # Traditional YAML-based loading
-        else:
-            if verbose:
-                print("📄 Traditional loading from YAML configuration")
-            
-            self.modalities = load_modalities(self.config["modalities"])
-            return self.modalities
+        def _load_data_intelligently(self, verbose: bool) -> Dict[str, Any]:
+            """
+            Load **pre‑computed embeddings** from the `embeddings/` folder
+            (if present), otherwise fall back to the smart / YAML loaders.
+            """
+            emb_dir = Path("embeddings")
+            if emb_dir.exists() and any(emb_dir.glob("*.npy")):
+                if verbose:
+                    print(f"📥 Loading cached embeddings from: {emb_dir}/")
+                from loaders import load_embeddings                     # helper we added
+                return {
+                    p.stem: load_embeddings(emb_dir, p.stem)
+                    for p in emb_dir.glob("*.npy")
+                }
+    
+            # ── legacy paths (raw files) ─────────────────────────────
+            if 'dynamic_dataset' in self.config:                       # CLI override
+                if verbose:
+                    print(f"🔍 Smart loading raw data from: {self.config['dynamic_dataset']}")
+                return smart_load_dataset(
+                    dataset_path=self.config['dynamic_dataset'],
+                    modalities=self.config.get('dynamic_modalities'),
+                    max_items=self.config['evaluation'].get('max_items')
+                )
+            else:                                                      # YAML
+                if verbose:
+                    print("📄 Traditional raw‑data loading from YAML configuration")
+                return load_modalities(self.config["modalities"])
 
     def _initialize_metrics(self, verbose: bool):
         """Initialize evaluation metrics"""
