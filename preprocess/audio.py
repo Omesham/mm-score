@@ -7,7 +7,7 @@ import torchaudio
 from laion_clap import CLAP                         # pip install laion-clap
 
 from preprocess.base import BasePreprocessor
-from loaders import UniversalDataLoader             # only used by run()
+from Utils.loaders import UniversalDataLoader             # only used by run()
 
 # ────────────────────────────────────────────────────────────
 # fixed audio parameters
