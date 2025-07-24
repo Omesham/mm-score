@@ -486,6 +486,11 @@ Research Examples:
     parser.add_argument("--quiet", "-q", action="store_true",
                        help="Quiet mode - minimal output")
     
+    parser.add_argument(
+    "--preprocess", action="store_true",
+    help="Run preprocess_dataset.py first, then evaluate")
+
+    
     args = parser.parse_args()
     
     # Prepare dynamic overrides
