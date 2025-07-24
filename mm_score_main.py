@@ -29,6 +29,19 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from metrics import get_metric
 from loaders import load_modalities, smart_load_dataset
 
+
+def run_preprocess(dataset: str, mods: list[str] | None, verbose=True):
+        """Spawn preprocess_dataset.py with the same CLI you’d use by hand."""
+        cmd = [sys.executable, "preprocess_dataset.py"]
+        if dataset:
+            cmd += ["--dataset", dataset]
+        if mods:
+            cmd += ["--modalities", *mods]
+        if verbose:
+            print(f"[Preprocess] {' '.join(cmd)}")
+        subprocess.run(cmd, check=True)           # raises if preprocessing fails
+
+
 class EnhancedMMSCOREvaluator:
     """
     Enhanced MM-Score evaluator that combines research rigor with smart features.
@@ -229,19 +242,8 @@ class EnhancedMMSCOREvaluator:
             if verbose:
                 print(" Traditional raw‑data loading from YAML configuration")
             return load_modalities(self.config["modalities"])
-
     
-    def run_preprocess(dataset: str, mods: list[str] | None, verbose=True):
-        """Spawn preprocess_dataset.py with the same CLI you’d use by hand."""
-        cmd = [sys.executable, "preprocess_dataset.py"]
-        if dataset:
-            cmd += ["--dataset", dataset]
-        if mods:
-            cmd += ["--modalities", *mods]
-        if verbose:
-            print(f"[Preprocess] {' '.join(cmd)}")
-        subprocess.run(cmd, check=True)           # raises if preprocessing fails
-
+    
     def _initialize_metrics(self, verbose: bool):
         """Initialize evaluation metrics"""
         
