@@ -1,233 +1,151 @@
-import os
-import json
+# metrics/alignment.py
+# ────────────────────────────────────────────────────────────
+# AlignmentMetric
+#   • Semantic (image ↔ text) with CLIP
+#   • Temporal (video / audio / sensor / …) by cross‑correlation
+#   • Produces an overall alignment score ∈ [0,1] **and**
+#     a quality‑assessment section listing up‑to‑3 fixes.
+# ────────────────────────────────────────────────────────────
+from typing import Dict, Any, List
 import numpy as np
-from typing import Dict, List, Any, Union
-from pathlib import Path
 
-# Import CLIP with error handling
+# ---------- optional CLIP import ----------------------------------------
 try:
-    import torch
-    import clip
+    import torch, clip
     from PIL import Image
-    CLIP_AVAILABLE = True
+    _CLIP_OK = True
 except ImportError:
-    CLIP_AVAILABLE = False
+    _CLIP_OK = False
 
-class ComprehensiveAlignmentMetric:
-    """
-    Simple, clean MM-Score evaluator with minimal output.
-    Shows only what you need to know.
-    """
+# ---------- helpers ------------------------------------------------------
+def _cos(a: np.ndarray, b: np.ndarray) -> float:
+    a, b = a.reshape(-1), b.reshape(-1)
+    return float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8))
 
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.clip_model = None
-        self.clip_preprocess = None
-        
-        # Load CLIP quietly if available
-        if CLIP_AVAILABLE:
-            try:
-                self.clip_model, self.clip_preprocess = clip.load("ViT-B/32", device="cpu")
-            except:
-                pass
+def _grade(s: float) -> str:
+    return ("EXCELLENT" if s >= .8 else
+            "GOOD"      if s >= .6 else
+            "FAIR"      if s >= .4 else
+            "POOR"      if s >= .2 else
+            "CRITICAL")
 
-    def evaluate(self, modalities: Dict[str, Any]) -> Dict[str, Any]:
-        """Run evaluation with simple, clean output"""
-        
-        print("🔄 Running evaluation...")
-        
-        # Get scores
-        alignment_score = self._evaluate_alignment(modalities)
-        noise_score = self._evaluate_noise(modalities)
-        imbalance_score = self._evaluate_imbalance(modalities)
-        
-        # Calculate overall score
-        overall_score = (
-            alignment_score * 0.5 + 
-            noise_score * 0.3 + 
-            imbalance_score * 0.2
-        )
-        
-        # Create results
-        results = {
+# ────────────────────────────────────────────────────────────
+class AlignmentMetric:
+    TEMPORAL = {"video", "audio", "sensor", "temperature",
+                "heart", "brain", "eyes", "emotions"}
+
+    # ------------------------------------------------------------------
+    def __init__(self, cfg: Dict[str, Any]):
+        self.cfg = cfg
+        self.clip_model, self.clip_pre = (None, None)
+        if _CLIP_OK:
+            self.clip_model, self.clip_pre = clip.load("ViT-B/32",
+                                                       device="cpu", jit=False)
+            self.clip_model.eval()
+
+    # ------------------------------------------------------------------
+    def evaluate(self, mods: Dict[str, Any]) -> Dict[str, Any]:
+        sem = self._semantic(mods)          # None or [0,1]
+        tmp = self._temporal(mods)          # None or [0,1]
+
+        if sem is not None and tmp is not None:
+            align = 0.5 * sem + 0.5 * tmp
+        elif sem is not None:
+            align = sem
+        elif tmp is not None:
+            align = tmp
+        else:
+            align = 0.0
+
+        recs = self._make_recs(sem, tmp, mods)[:3]   # top‑3
+
+        return {
             "mm_score_summary": {
-                "overall_score": round(overall_score, 2),
-                "overall_grade": self._get_grade(overall_score),
-                "component_scores": {
-                    "alignment": round(alignment_score, 2),
-                    "noise": round(noise_score, 2),
-                    "imbalance": round(imbalance_score, 2)
-                }
+                "overall_score": align,
+                "overall_grade": _grade(align),
+                "component_scores": {"alignment": align}
+            },
+            "quality_assessment": {
+                "recommendations": recs
             }
         }
-        
-        # Print simple results
-        self._print_simple_results(modalities, results)
-        
-        return results
 
-    def _evaluate_alignment(self, modalities: Dict[str, Any]) -> float:
-        """Evaluate alignment between modalities"""
-        
-        mod_names = list(modalities.keys())
-        
-        # Single modality = no alignment possible
-        if len(mod_names) < 2:
-            return 0.0
-        
-        # Image + Text = CLIP semantic alignment
-        if "image" in mod_names and "text" in mod_names:
-            return self._clip_alignment(modalities["image"], modalities["text"])
-        
-        # Other combinations = basic similarity
-        return 0.6  # Default reasonable score
-    
-    def _clip_alignment(self, images, texts) -> float:
-        """CLIP-based image-text alignment"""
-        
-        if not CLIP_AVAILABLE or self.clip_model is None:
-            return 0.6  # Fallback score
-        
-        try:
-            # Process image
-            if isinstance(images, np.ndarray):
-                if len(images.shape) == 3:  # Single image
-                    image = Image.fromarray(images.astype('uint8'), 'RGB')
-                else:
-                    return 0.6
-            else:
-                return 0.6
-            
-            # Process text
-            if isinstance(texts, dict) and 'annotations' in texts:
-                text_sample = str(texts['annotations'][0]) if texts['annotations'] else "image"
-            elif isinstance(texts, list) and texts:
-                text_sample = str(texts[0])
-            else:
-                text_sample = "image"
-            
-            # CLIP similarity
-            image_input = self.clip_preprocess(image).unsqueeze(0)
-            text_input = clip.tokenize([text_sample])
-            
-            with torch.no_grad():
-                image_features = self.clip_model.encode_image(image_input)
-                text_features = self.clip_model.encode_text(text_input)
-                
-                similarity = torch.cosine_similarity(image_features, text_features)
-                score = float(similarity.item())
-                
-                # Normalize to 0-1 range
-                return max(0.0, min(1.0, (score + 1) / 2))
-                
-        except Exception:
-            return 0.6  # Safe fallback
+    # ─────────────────────────────────────────────────────────
+    # semantic alignment (image ↔ text)
+    # ─────────────────────────────────────────────────────────
+    def _semantic(self, mods: Dict[str, Any]) -> float | None:
+        if not ({"image", "text"} <= mods.keys()) or not _CLIP_OK:
+            return None
+        img = self._first_array(mods["image"])
+        txt = self._first_text(mods["text"])
 
-    def _evaluate_noise(self, modalities: Dict[str, Any]) -> float:
-        """Simple noise evaluation"""
-        
-        noise_scores = []
-        
-        for name, data in modalities.items():
-            if isinstance(data, np.ndarray) and len(data) > 10:
-                # Statistical outlier detection
-                mean_val = np.mean(data.flatten())
-                std_val = np.std(data.flatten())
-                outliers = np.abs(data.flatten() - mean_val) > 2 * std_val
-                outlier_ratio = np.sum(outliers) / len(data.flatten())
-                noise_scores.append(1.0 - outlier_ratio)
-            else:
-                noise_scores.append(0.9)  # Assume good quality for non-arrays
-        
-        return np.mean(noise_scores) if noise_scores else 0.9
+        with torch.no_grad():
+            img_t = self.clip_pre(Image.fromarray(img)).unsqueeze(0)
+            txt_t = clip.tokenize([txt])
+            v_img = self.clip_model.encode_image(img_t).cpu().numpy()[0]
+            v_txt = self.clip_model.encode_text(txt_t).cpu().numpy()[0]
+        return (_cos(v_img, v_txt) + 1) / 2         # → [0,1]
 
-    def _evaluate_imbalance(self, modalities: Dict[str, Any]) -> float:
-        """Simple imbalance evaluation"""
-        
-        # Count samples in each modality
-        counts = {}
-        for name, data in modalities.items():
-            if isinstance(data, np.ndarray):
-                counts[name] = data.shape[0] if len(data.shape) > 0 else 1
-            elif isinstance(data, dict):
-                if 'annotations' in data:
-                    counts[name] = len(data['annotations'])
-                elif 'images' in data:
-                    counts[name] = len(data['images'])
-                else:
-                    counts[name] = len(data)
-            elif hasattr(data, '__len__'):
-                counts[name] = len(data)
-            else:
-                counts[name] = 1
-        
-        if len(counts) < 2:
-            return 1.0  # Perfect balance for single modality
-        
-        # Calculate ratio
-        count_values = list(counts.values())
-        max_count = max(count_values)
-        min_count = min(count_values)
-        ratio = max_count / min_count if min_count > 0 else float('inf')
-        
-        # Score based on ratio
-        if ratio <= 2.0:
-            return 1.0      # Excellent
-        elif ratio <= 5.0:
-            return 0.8      # Good
-        elif ratio <= 10.0:
-            return 0.6      # Fair
-        elif ratio <= 50.0:
-            return 0.3      # Poor
-        else:
-            return 0.1      # Critical
+    # ─────────────────────────────────────────────────────────
+    # temporal alignment  (cross‑corr on mean signal)
+    # ─────────────────────────────────────────────────────────
+    def _temporal(self, mods: Dict[str, Any]) -> float | None:
+        traces = [self._first_array(v) for k, v in mods.items()
+                  if k in self.TEMPORAL]
 
-    def _get_grade(self, score: float) -> str:
-        """Convert score to grade"""
-        if score >= 0.8:
-            return "EXCELLENT"
-        elif score >= 0.6:
-            return "GOOD"
-        elif score >= 0.4:
-            return "FAIR"
-        elif score >= 0.2:
-            return "POOR"
-        else:
-            return "CRITICAL"
+        if len(traces) < 2:
+            return None
 
-    def _print_simple_results(self, modalities: Dict[str, Any], results: Dict[str, Any]):
-        """Print clean, simple results"""
-        
-        summary = results["mm_score_summary"]
-        components = summary["component_scores"]
-        
-        print("\n" + "="*50)
-        print("🎯 MM-SCORE RESULTS")
-        print("="*50)
-        
-        # Dataset info
-        print(f"📂 Modalities: {', '.join(modalities.keys())}")
-        
-        # Sample counts
-        for name, data in modalities.items():
-            if isinstance(data, dict) and 'annotations' in data:
-                count = len(data['annotations'])
-            elif hasattr(data, '__len__'):
-                count = len(data)
-            else:
-                count = 1
-            print(f"   {name}: {count} samples")
-        
-        print()
-        
-        # Scores
-        print(f"📊 Overall Score: {summary['overall_score']} ({summary['overall_grade']})")
-        print()
-        print("Component Scores:")
-        print(f"  Alignment: {components['alignment']} ({self._get_grade(components['alignment'])})")
-        print(f"  Noise: {components['noise']} ({self._get_grade(components['noise'])})")
-        print(f"  Imbalance: {components['imbalance']} ({self._get_grade(components['imbalance'])})")
-        
-        print("\n" + "="*50)
-        print("✅ Evaluation complete.")
-        print("="*50)
+        L = min(t.shape[0] for t in traces)               # equal length
+        traces = [(t[:L].mean(1) if t.ndim > 1 else t[:L]) for t in traces]
+
+        sims = [abs(np.corrcoef(traces[i], traces[j])[0, 1])
+                for i in range(len(traces))
+                for j in range(i+1, len(traces))]
+        return float(np.mean(sims))
+
+    # ─────────────────────────────────────────────────────────
+    # actionable feedback
+    # ─────────────────────────────────────────────────────────
+    def _make_recs(self, sem, tmp, mods) -> List[str]:
+        recs = []
+        if sem is not None and sem < 0.6 and {"image", "text"} <= mods.keys():
+            recs.append("Image captions and texts look weakly aligned "
+                        f"(CLIP‑score ≈ {sem:.2f}). Review descriptions.")
+        if tmp is not None and tmp < 0.6:
+            recs.append("Temporal streams appear out‑of‑sync "
+                        f"(corr ≈ {tmp:.2f}). Check timestamps / trimming.")
+        if "audio" in mods and self._is_silent(mods["audio"]):
+            recs.append("Many audio segments are near‑silent; verify recordings.")
+        if not recs:
+            recs.append("Alignment is strong—no immediate fixes needed.")
+        return recs
+
+    # quick silence check for audio arrays --------------------
+    @staticmethod
+    def _is_silent(a) -> bool:
+        arr = AlignmentMetric._first_array(a)
+        return arr.std() < 1e-3
+
+    # ─────────────────────────────────────────────────────────
+    # utility extractors
+    # ─────────────────────────────────────────────────────────
+    @staticmethod
+    def _first_array(obj):
+        if isinstance(obj, dict) and "emb" in obj:
+            return obj["emb"]
+        if isinstance(obj, list):
+            return AlignmentMetric._first_array(obj[0])
+        if isinstance(obj, np.ndarray):
+            return obj
+        raise TypeError("Unsupported array type")
+
+    @staticmethod
+    def _first_text(obj):
+        if isinstance(obj, list) and obj:
+            return str(obj[0])
+        if isinstance(obj, dict) and obj.get("annotations"):
+            return str(obj["annotations"][0])
+        if isinstance(obj, str):
+            return obj
+        return "sample text"
