@@ -516,7 +516,13 @@ Research Examples:
         overrides['max_items'] = args.max_items
     if args.output:
         overrides['output_file'] = args.output
-    
+    #Preprocess of set to tru
+    if args.preprocess:
+    run_preprocess(
+        dataset=args.dataset or "",
+        mods=args.modalities,
+        verbose=not args.quiet
+    )
     # Initialize and run evaluator
     evaluator = EnhancedMMSCOREvaluator(
         config_path=args.config,
