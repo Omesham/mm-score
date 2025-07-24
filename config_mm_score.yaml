@@ -18,7 +18,7 @@ modalities:
 
 # COMPREHENSIVE EVALUATION SETTINGS
 evaluation:
-  # All evaluation metrics (your research contributions)
+  # All evaluation metrics
   metrics:
     - alignment    # Cross-correlation temporal + CLIP semantic alignment
     - noise       # Statistical outlier detection + quality assessment
