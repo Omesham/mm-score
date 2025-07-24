@@ -19,7 +19,9 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from loaders import load_embeddings                     
+from Utils.loaders import load_embeddings         
+import subprocess
+
 
 # Add current directory to Python path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -228,6 +230,17 @@ class EnhancedMMSCOREvaluator:
                 print(" Traditional raw‑data loading from YAML configuration")
             return load_modalities(self.config["modalities"])
 
+    
+    def run_preprocess(dataset: str, mods: list[str] | None, verbose=True):
+        """Spawn preprocess_dataset.py with the same CLI you’d use by hand."""
+        cmd = [sys.executable, "preprocess_dataset.py"]
+        if dataset:
+            cmd += ["--dataset", dataset]
+        if mods:
+            cmd += ["--modalities", *mods]
+        if verbose:
+            print(f"[Preprocess] {' '.join(cmd)}")
+        subprocess.run(cmd, check=True)           # raises if preprocessing fails
 
     def _initialize_metrics(self, verbose: bool):
         """Initialize evaluation metrics"""
