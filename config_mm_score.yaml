@@ -24,7 +24,7 @@ evaluation:
     - noise       # Statistical outlier detection + quality assessment
     - imbalance   # Count ratios + distribution analysis
   
-  # Research-grade evaluation weights (based on your paper)
+  # Research-grade evaluation weights
   weights:
     alignment: 0.5    # 50% - Most critical for multimodal AI training
     noise: 0.3       # 30% - Data quality affects model performance  
