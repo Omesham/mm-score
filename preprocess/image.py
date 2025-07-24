@@ -6,7 +6,7 @@ from PIL import Image
 import clip
 
 from preprocess.base import BasePreprocessor
-from loaders import UniversalDataLoader
+from Utils.loaders import UniversalDataLoader
 
 # ------------------------------------------------------------
 _clip, _preproc = clip.load("ViT-B/32", device="cpu")  # stays global
