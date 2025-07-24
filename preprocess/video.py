@@ -12,7 +12,7 @@ import clip                            # repo provides ActionCLIP wrapper too
 
 from preprocess.base       import BasePreprocessor
 from preprocess.clip_base  import clip_preprocess          # reuse resize / crop
-from loaders               import UniversalDataLoader      # used only by run()
+from Utils.loaders               import UniversalDataLoader      # used only by run()
 
 # ---------------------------------------------------------------------------
 # 1) load ActionCLIP *once* at import time
