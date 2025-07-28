@@ -42,6 +42,8 @@ class AlignmentMetric:
             self.clip_model, self.clip_pre = clip.load("ViT-B/32",
                                                        device="cpu", jit=False)
             self.clip_model.eval()
+        self._temporal_length_range = None
+        self._semantic_length_mismatch = False
 
     # ------------------------------------------------------------------
     def evaluate(self, mods: Dict[str, Any]) -> Dict[str, Any]:
@@ -76,8 +78,16 @@ class AlignmentMetric:
     def _semantic(self, mods: Dict[str, Any]) -> float | None:
         if not ({"image", "text"} <= mods.keys()) or not _CLIP_OK:
             return None
-        img = self._first_array(mods["image"])
-        txt = self._first_text(mods["text"])
+
+        images = mods["image"]
+        texts = mods["text"]
+
+        if isinstance(images, list) and isinstance(texts, list):
+            if len(images) != len(texts):
+                self._semantic_length_mismatch = True
+
+        img = self._first_array(images)
+        txt = self._first_text(texts)
 
         with torch.no_grad():
             img_t = self.clip_pre(Image.fromarray(img)).unsqueeze(0)
@@ -96,7 +106,11 @@ class AlignmentMetric:
         if len(traces) < 2:
             return None
 
-        L = min(t.shape[0] for t in traces)               # equal length
+        lengths = [t.shape[0] for t in traces]
+        min_len, max_len = min(lengths), max(lengths)
+        self._temporal_length_range = (min_len, max_len)
+
+        L = min_len  # truncate to match
         traces = [(t[:L].mean(1) if t.ndim > 1 else t[:L]) for t in traces]
 
         sims = [abs(np.corrcoef(traces[i], traces[j])[0, 1])
@@ -112,9 +126,16 @@ class AlignmentMetric:
         if sem is not None and sem < 0.6 and {"image", "text"} <= mods.keys():
             recs.append("Image captions and texts look weakly aligned "
                         f"(CLIP‑score ≈ {sem:.2f}). Review descriptions.")
+        if self._semantic_length_mismatch:
+            recs.append("Image and text modalities have mismatched lengths. Ensure one caption per image.")
         if tmp is not None and tmp < 0.6:
             recs.append("Temporal streams appear out‑of‑sync "
                         f"(corr ≈ {tmp:.2f}). Check timestamps / trimming.")
+        if hasattr(self, "_temporal_length_range"):
+            min_len, max_len = self._temporal_length_range
+            if max_len - min_len > 10:
+                recs.append("Temporal streams have inconsistent lengths "
+                            f"(range: {min_len}–{max_len}). Consider trimming or resampling to align durations.")
         if "audio" in mods and self._is_silent(mods["audio"]):
             recs.append("Many audio segments are near‑silent; verify recordings.")
         if not recs:
