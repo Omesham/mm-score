@@ -63,7 +63,13 @@ def main(args):
             continue
 
         print(f"[Run]  {modality:6} | {len(paths):5} files → {out_root}/{modality}.npy")
-        pre = preproc_cls(device=args.device)
+        if modality == "audio":
+            pre = preproc_cls(device=args.device,
+                              use_clap=args.use_clap,
+                              use_speecht5=args.use_speecht5)
+        else:
+            pre = preproc_cls(device=args.device)
+
         pre.encode_and_save(paths, out_root / f"{modality}.npy")
 
     print("\n  All embeddings saved in", out_root)
