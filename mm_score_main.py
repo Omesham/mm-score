@@ -27,7 +27,7 @@ import subprocess
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from metrics import get_metric
-from loaders import load_modalities, smart_load_dataset
+from Utils.loaders import load_modalities, smart_load_dataset
 
 
 def run_preprocess(dataset: str, mods: list[str] | None, verbose=True):
@@ -223,7 +223,6 @@ class EnhancedMMSCOREvaluator:
         if emb_dir.exists() and any(emb_dir.glob("*.npy")):
             if verbose:
                 print(f" Loading cached embeddings from: {emb_dir}/")
-            from loaders import load_embeddings                     # helper we added
             return {
                 p.stem: load_embeddings(emb_dir, p.stem)
                 for p in emb_dir.glob("*.npy")
