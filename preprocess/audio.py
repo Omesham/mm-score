@@ -5,6 +5,7 @@ from typing import List, Iterable, Tuple
 import torch
 import torchaudio
 from laion_clap import CLAP                         # pip install laion-clap
+from transformers import SpeechT5Processor, SpeechT5ForTextToSpeech, SpeechT5ForSpeechToText
 
 from preprocess.base import BasePreprocessor
 from Utils.loaders import UniversalDataLoader             # only used by run()
@@ -17,13 +18,20 @@ _mel = torchaudio.transforms.MelSpectrogram(
 
 class AudioPreprocessor(BasePreprocessor):
     """
-    Encode *.wav / *.flac / … files with LAION–CLAP → one audio.npy
-        {"ids": [...], "emb": (N, 512)}
+    Dual audio preprocessor:
+    - CLAP: Embedding-based similarity (audio ↔ text)
+    - SpeechT5: Text generation from audio (ASR)
+    Outputs:
+      - audio.npy → {"ids": [...], "emb": (N, 512)}
+      - audio_transcripts.txt → ID + SpeechT5-generated text
     """
 
     def __init__(self, device: str = "cuda"):
-        model = CLAP.get_model("music_audioset").to(device).eval()
-        super().__init__(model, device=device)
+        self.device = device
+        self.clap_model = CLAP.get_model("music_audioset").to(device).eval()
+        self.speecht5_processor = SpeechT5Processor.from_pretrained("microsoft/speecht5_asr")
+        self.speecht5_model = SpeechT5ForSpeechToText.from_pretrained("microsoft/speecht5_asr").to(device).eval()
+        super().__init__(self.clap_model, device=device)
 
     # ---------- Loader hook ----------------------------------
     def iter_samples(self, paths: List[str]) -> Iterable[Tuple[str, torch.Tensor]]:
@@ -36,14 +44,27 @@ class AudioPreprocessor(BasePreprocessor):
 
     # ---------- vector extraction override ------------------
     def get_vector(self, batch: torch.Tensor) -> torch.Tensor:
-        # CLAP expects mono log‑mel (B, 1, n_mels, T)
         if batch.dim() == 4:                            # (B,C,M,T)
             batch = batch.mean(1, keepdim=True)         # down‑mix channels
-        return self.model.encode_audio(batch.to(self.device))
+        return self.clap_model.encode_audio(batch.to(self.device))
 
+    # ---------- ASR text generation -------------------------
+    def generate_transcripts(self, paths: List[str], output_txt: Path):
+        output_txt.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_txt, "w", encoding="utf-8") as f:
+            for path in paths:
+                wav, sr = torchaudio.load(path)
+                if sr != SR:
+                    wav = torchaudio.functional.resample(wav, sr, SR)
+                input_values = self.speecht5_processor(wav.squeeze(0), sampling_rate=SR, return_tensors="pt").input_values.to(self.device)
+                with torch.no_grad():
+                    predicted_ids = self.speecht5_model.generate(input_values)
+                transcription = self.speecht5_processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
+                f.write(f"{Path(path).stem}: {transcription}\n")
 
 # ────────────────────────────────────────────────────────────
-# Optional helper to run stand‑alone (image.py & text.py use the same idea)
+# Optional helper to run stand‑alone
+
 def run(dataset_root: str, out_dir: str, device="cuda"):
     detected = UniversalDataLoader.auto_detect_modalities(dataset_root)
     audio_files = detected.get("audio", [])
@@ -53,3 +74,4 @@ def run(dataset_root: str, out_dir: str, device="cuda"):
 
     pre = AudioPreprocessor(device=device)
     pre.encode_and_save(audio_files, Path(out_dir) / "audio.npy")
+    pre.generate_transcripts(audio_files, Path(out_dir) / "audio_transcripts.txt")
