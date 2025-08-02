@@ -6,9 +6,11 @@
 #   • Detects “missing‑image” situations (e.g. more text than image samples)
 #   • Produces an overall noise score ∈ [0,1]  + up‑to‑3 recommendations
 # ────────────────────────────────────────────────────────────
-
-from typing import Dict, Any, List                           # type hints
+from __future__ import annotations      # ← must be first
+from typing import Dict, Any, List, Tuple                          # type hints
 import numpy as np                                           # maths / arrays
+
+
 
 # ────────────────────────────────────────────────────────────
 # helper: map numeric score → qualitative label
@@ -79,7 +81,7 @@ class NoiseMetric:
     # ========================================================
     # per‑modality scoring helpers
     # ========================================================
-    def _score_audio(self, wav: np.ndarray) -> tuple[float, List[str]]:
+    def _score_audio(self, wav: np.ndarray) -> Tuple[float, List[str]]:
         wav = wav.flatten()                                  # 1‑D
         clip_ratio = np.mean(np.abs(wav) > _CLIP_THR)        # fraction clipped
         silence    = np.std(wav) < _SIL_STD                  # near‑zero variance
@@ -92,7 +94,7 @@ class NoiseMetric:
             recs.append("Audio track is nearly silent; check microphone or file corruption.")
         return max(0.0, score), recs
 
-    def _score_image(self, img: np.ndarray) -> tuple[float, List[str]]:
+    def _score_image(self, img: np.ndarray) -> Tuple[float, List[str]]:
         img_f = img.astype("float32") / 255.0                # 0‑1
         dark   = np.mean(img_f < _DARK_P)                    # % very dark pixels
         bright = np.mean(img_f > _BRIGHT_P)                  # % very bright pixels
@@ -106,7 +108,7 @@ class NoiseMetric:
             recs.append("Images are over‑exposed; reduce brightness.")
         return max(0.0, score), recs
 
-    def _score_generic(self, arr: np.ndarray) -> tuple[float, List[str]]:
+    def _score_generic(self, arr: np.ndarray) -> Tuple[float, List[str]]:
         flat     = arr.flatten()                             # 1‑D
         m, s     = np.mean(flat), np.std(flat) + 1e-8        # mean & std
         outliers = np.mean(np.abs(flat - m) > 2 * s)         # % >2σ
