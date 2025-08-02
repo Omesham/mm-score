@@ -5,5 +5,5 @@ python mm_score_main.py \
   --dataset /mmfs1/scratch/jacks.local/ojanigala/Anomaly_Detection/mm-score/MSCOCO \
   --preprocess \
   --max-items 10 \
-  --output results_200.json
+  --output results.json
 
