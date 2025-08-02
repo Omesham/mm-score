@@ -3,7 +3,7 @@ import clip, torch
 from preprocess.base import BasePreprocessor
 
 # load once at import time
-_clip_model, _clip_preprocess = clip.load("ViT-B/32", device="cpu", jit=False)
+_clip_model, _clip_preprocess = clip.load("ViT-B/32", device="cuda", jit=False)
 
 class CLIPPreprocessor(BasePreprocessor):
     def __init__(self, device: str = "cuda"):
