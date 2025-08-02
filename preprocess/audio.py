@@ -3,7 +3,9 @@ from typing import List, Iterable, Tuple
 
 import torch
 import torchaudio
-from laion_clap import CLAP                         # pip install laion-clap
+from laion_clap import CLAP_Module
+
+                       # pip install laion-clap
 from transformers import SpeechT5Processor, SpeechT5ForSpeechToText
 
 from preprocess.base import BasePreprocessor
@@ -31,7 +33,9 @@ class AudioPreprocessor(BasePreprocessor):
         self.use_speecht5 = use_speecht5
 
         if use_clap:
-            self.clap_model = CLAP.get_model("music_audioset").to(device).eval()
+            self.clap_model = CLAP_Module(enable_fusion=False).to(device)
+            self.clap_model.load_ckpt()  # ← This loads the pretrained weights
+            self.clap_model.eval()
         else:
             self.clap_model = None
 
