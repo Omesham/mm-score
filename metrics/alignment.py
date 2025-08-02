@@ -8,6 +8,7 @@
 # ────────────────────────────────────────────────────────────
 from typing import Dict, Any, List
 import numpy as np
+from typing import Union
 
 # ---------- optional CLIP import ----------------------------------------
 try:
@@ -72,34 +73,54 @@ class AlignmentMetric:
             }
         }
 
+  
     # ─────────────────────────────────────────────────────────
-    # semantic alignment (image ↔ text)
+    # semantic alignment (image ↔ text)
     # ─────────────────────────────────────────────────────────
-    def _semantic(self, mods: Dict[str, Any]) -> float | None:
-        if not ({"image", "text"} <= mods.keys()) or not _CLIP_OK:
+    def _semantic(self, mods: Dict[str, Any]) -> Union[float, None]:
+        # Need both modalities
+        if not {"image", "text"} <= mods.keys():
             return None
 
         images = mods["image"]
-        texts = mods["text"]
+        texts  = mods["text"]
 
-        if isinstance(images, list) and isinstance(texts, list):
-            if len(images) != len(texts):
-                self._semantic_length_mismatch = True
+        # ---------- 1) Direct use of pre-computed CLIP embeddings ----------
+        # Dict format: {"ids": [...], "emb": ndarray (N,512)}
+        if isinstance(images, dict) and "emb" in images \
+           and isinstance(texts,  dict) and "emb" in texts:
+            v_img, v_txt = images["emb"][0], texts["emb"][0]
+            return (_cos(v_img, v_txt) + 1) / 2       # → [0,1]
 
-        img = self._first_array(images)
-        txt = self._first_text(texts)
+        # Plain ndarray format: (N,512)
+        if isinstance(images, np.ndarray) and images.ndim == 2 \
+           and isinstance(texts,  np.ndarray) and texts.ndim == 2 \
+           and images.shape[1] == texts.shape[1] == 512:
+            return (_cos(images[0], texts[0]) + 1) / 2
+
+        # ---------- 2) Fallback: raw image + raw caption -------------------
+        if not _CLIP_OK:          # CLIP not available → cannot compute
+            return None
+
+        # If lists are mismatched in length, flag recommendation
+        if isinstance(images, list) and isinstance(texts, list) and len(images) != len(texts):
+            self._semantic_length_mismatch = True
+
+        img = self._first_array(images)   # (H,W,3) uint8
+        txt = self._first_text(texts)     # str
 
         with torch.no_grad():
             img_t = self.clip_pre(Image.fromarray(img)).unsqueeze(0)
             txt_t = clip.tokenize([txt])
             v_img = self.clip_model.encode_image(img_t).cpu().numpy()[0]
             v_txt = self.clip_model.encode_text(txt_t).cpu().numpy()[0]
-        return (_cos(v_img, v_txt) + 1) / 2         # → [0,1]
+        return (_cos(v_img, v_txt) + 1) / 2
+
 
     # ─────────────────────────────────────────────────────────
     # temporal alignment  (cross‑corr on mean signal)
     # ─────────────────────────────────────────────────────────
-    def _temporal(self, mods: Dict[str, Any]) -> float | None:
+    def _temporal(self, mods: Dict[str, Any]) -> Union[float, None]:
         traces = [self._first_array(v) for k, v in mods.items()
                   if k in self.TEMPORAL]
 
@@ -121,26 +142,52 @@ class AlignmentMetric:
     # ─────────────────────────────────────────────────────────
     # actionable feedback
     # ─────────────────────────────────────────────────────────
+    # metrics/alignment.py  – inside AlignmentMetric
+    # -------------------------------------------------------------
     def _make_recs(self, sem, tmp, mods) -> List[str]:
-        recs = []
+        """
+        Build a short list of actionable suggestions based on which
+        components were *really* computed.
+    
+           sem  → semantic score  (None if image+text missing or CLIP disabled)
+           tmp  → temporal score  (None if <2 temporal modalities)
+           mods → dict of loaded modalities
+        """
+        recs: List[str] = []
+    
+        # ---------- semantic alignment recommendations --------------------
         if sem is not None and sem < 0.6 and {"image", "text"} <= mods.keys():
             recs.append("Image captions and texts look weakly aligned "
-                        f"(CLIP‑score ≈ {sem:.2f}). Review descriptions.")
+                        f"(CLIP-score ≈ {sem:.2f}). Review descriptions.")
+    
         if self._semantic_length_mismatch:
-            recs.append("Image and text modalities have mismatched lengths. Ensure one caption per image.")
-        if tmp is not None and tmp < 0.6:
-            recs.append("Temporal streams appear out‑of‑sync "
-                        f"(corr ≈ {tmp:.2f}). Check timestamps / trimming.")
-        if hasattr(self, "_temporal_length_range"):
-            min_len, max_len = self._temporal_length_range
-            if max_len - min_len > 10:
-                recs.append("Temporal streams have inconsistent lengths "
-                            f"(range: {min_len}–{max_len}). Consider trimming or resampling to align durations.")
+            recs.append("Image and text modalities have mismatched lengths. "
+                        "Ensure exactly one caption per image—or consolidate multiple captions.")
+    
+        # ---------- temporal alignment recommendations -------------------
+        if tmp is not None:
+            if tmp < 0.6:
+                recs.append("Temporal streams appear out-of-sync "
+                            f"(corr ≈ {tmp:.2f}). Check timestamps or trimming.")
+    
+            # only if _temporal_length_range exists *and* is a tuple
+            if getattr(self, "_temporal_length_range", None):
+                min_len, max_len = self._temporal_length_range
+                if max_len - min_len > 10:
+                    recs.append("Temporal streams have inconsistent lengths "
+                                f"(range: {min_len}–{max_len}). "
+                                "Consider trimming or resampling to align durations.")
+    
+        # ---------- audio-specific check ---------------------------------
         if "audio" in mods and self._is_silent(mods["audio"]):
-            recs.append("Many audio segments are near‑silent; verify recordings.")
+            recs.append("Many audio segments are near-silent; verify recordings.")
+    
+        # ---------- default ------------------------------------------------
         if not recs:
             recs.append("Alignment is strong—no immediate fixes needed.")
+    
         return recs
+
 
     # quick silence check for audio arrays --------------------
     @staticmethod
