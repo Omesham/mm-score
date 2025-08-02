@@ -6,6 +6,9 @@ import torch
 import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Any, Union
+import os
+import json
+import csv  
 
 class UniversalDataLoader:
     """Universal loader that auto-detects and handles any data format with smart capabilities"""
@@ -115,15 +118,105 @@ class UniversalDataLoader:
             print(f"[Error] Loading CSV file {file_path}: {e}")
             return None
 
+    
     @staticmethod
-    def load_text_data(file_path: str) -> List[str]:
-        """Load plain text files"""
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return f.readlines()
-        except Exception as e:
-            print(f"[Error] Loading text file {file_path}: {e}")
+    def load_text_data(path: Union[str, Path],
+                       max_items: int = None,
+                       verbose: bool = True) -> List[str]:
+        """
+        Robust text loader (file *or* folder).
+        • Supports .txt / .json / .jsonl / .csv / .tsv
+        • Recursively extracts every string, no matter how deeply nested.
+        """
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"[TextLoader] Path not found: {path}")
+
+        # ------------------------------------------------------------------ #
+        # 1️⃣  Collect files
+        # ------------------------------------------------------------------ #
+        if path.is_file():
+            files = [path]
+        else:
+            patterns = ["*.txt", "*.json", "*.jsonl", "*.csv", "*.tsv"]
+            files: List[Path] = []
+            for pat in patterns:
+                files.extend(path.rglob(pat))
+
+        if not files:
+            raise FileNotFoundError(f"[TextLoader] No supported text files under: {path}")
+
+        # ------------------------------------------------------------------ #
+        # 2️⃣  String extractor
+        # ------------------------------------------------------------------ #
+        def grab(obj):
+            if isinstance(obj, str):
+                return [obj.strip()] if obj.strip() else []
+            if isinstance(obj, dict):
+                out = []
+                for v in obj.values():
+                    out.extend(grab(v))
+                return out
+            if isinstance(obj, (list, tuple, set)):
+                out = []
+                for v in obj:
+                    out.extend(grab(v))
+                return out
             return []
+
+        # ------------------------------------------------------------------ #
+        # 3️⃣  Read files
+        # ------------------------------------------------------------------ #
+        texts: List[str] = []
+        for fp in files:
+            try:
+                suf = fp.suffix.lower()
+
+                # plain TXT -------------------------------------------------
+                if suf == ".txt":
+                    with fp.open("r", encoding="utf-8") as f:
+                        texts.extend(line.strip() for line in f if line.strip())
+
+                # JSON-Lines -----------------------------------------------
+                elif suf == ".jsonl":
+                    with fp.open("r", encoding="utf-8") as f:
+                        for i, line in enumerate(f):
+                            if max_items and len(texts) >= max_items:
+                                break
+                            if line.strip():
+                                texts.extend(grab(json.loads(line)))
+
+                # JSON -----------------------------------------------------
+                elif suf == ".json":
+                    with fp.open("r", encoding="utf-8") as f:
+                        texts.extend(grab(json.load(f)))
+
+                # CSV / TSV -----------------------------------------------
+                elif suf in {".csv", ".tsv"}:
+                    sep = "\t" if suf == ".tsv" else ","
+                    with fp.open("r", encoding="utf-8") as f:
+                        reader = csv.DictReader(f, delimiter=sep)
+                        for row in reader:
+                            texts.extend(grab(row))
+
+            except Exception as e:
+                if verbose:
+                    print(f"[TextLoader] Skipped {fp.name}: {e}")
+
+            if max_items and len(texts) >= max_items:
+                break
+
+        if not texts:
+            raise ValueError("[TextLoader] No valid text extracted.")
+
+        if max_items:
+            texts = texts[:max_items]
+
+        if verbose:
+            print(f"[TextLoader] Loaded {len(texts)} text snippets from {len(files)} file(s)")
+
+        return texts
+
 
     @staticmethod
     def load_image_data(file_path: str) -> np.ndarray:
@@ -635,38 +728,48 @@ def smart_load_dataset(dataset_path: str, modalities: List[str] = None, max_item
     loaded_data = {}
     loader = UniversalDataLoader()
     
+      
     for modality_name in target_modalities:
         files = available_modalities[modality_name]
         print(f"[Smart Loader] Loading {modality_name}: {len(files)} files")
-        
+    
         if len(files) == 1:
-            # Single file
+            # ---------- single file ----------
             data = loader.load_file(files[0])
             if data is not None:
-                # Apply max_items limit
                 if max_items and hasattr(data, '__len__') and len(data) > max_items:
                     if isinstance(data, (list, np.ndarray)):
                         data = data[:max_items]
                 loaded_data[modality_name] = data
-                print(f"[Smart Loader] ✅ Loaded {modality_name}: {type(data)} - {getattr(data, 'shape', len(data) if hasattr(data, '__len__') else 'N/A')}")
-        
+                print(f"[Smart Loader] ✅ Loaded {modality_name}: "
+                      f"{type(data)} – {getattr(data, 'shape', len(data))}")
         else:
-            # Multiple files - load first file for now (can be enhanced later)
-            data = loader.load_file(files[0])
-            if data is not None:
+            # ---------- multiple files ----------
+            imgs = []
+            for fp in files:
+                if max_items and len(imgs) >= max_items:
+                    break
+                arr = loader.load_file(fp, format_hint="image")  # force image loader
+                if arr is not None:
+                    imgs.append(arr)
+    
+            if imgs:
+                data = np.stack(imgs)          # (N,H,W,3)
                 loaded_data[modality_name] = data
-                print(f"[Smart Loader] ✅ Loaded {modality_name} (first file): {type(data)}")
-                print(f"[Smart Loader] Note: {len(files)-1} additional files available")
+                print(f"[Smart Loader] ✅ Loaded {modality_name}: {data.shape}")
+            else:
+                print(f"[Smart Loader] ❌ Failed to load any {modality_name} files")
     
     print(f"[Smart Loader] Smart loading complete: {list(loaded_data.keys())}")
     return loaded_data
+
 
 
 # ────────────────────────────────────────────────────────────
 # Helper for MM‑SCORE pre‑computed features
 # Place this at the bottom of loader.py
 
-def load_embeddings(emb_dir: str | Path, modality: str):
+def load_embeddings(emb_dir: Union[str, Path], modality: str):
     """
     Load the single .npy file produced by the pre‑processor.
     Returns a dict: {"ids": [...], "emb": ndarray (N, D)}
