@@ -30,16 +30,28 @@ from metrics import get_metric
 from Utils.loaders import load_modalities, smart_load_dataset
 
 
-def run_preprocess(dataset: str, mods: list[str] | None, verbose=True):
-        """Spawn preprocess_dataset.py with the same CLI you’d use by hand."""
-        cmd = [sys.executable, "preprocess_dataset.py"]
-        if dataset:
-            cmd += ["--dataset", dataset]
-        if mods:
-            cmd += ["--modalities", *mods]
-        if verbose:
-            print(f"[Preprocess] {' '.join(cmd)}")
-        subprocess.run(cmd, check=True)           # raises if preprocessing fails
+def run_preprocess(dataset: str,
+                   mods: Optional[List[str]],
+                   max_items: Optional[int] = None,   # ← NEW
+                   verbose: bool = True):
+    
+    """
+    Spawn preprocess_dataset.py with the same CLI you’d use by hand.
+    """
+    cmd = [sys.executable, "preprocess_dataset.py"]
+
+    if dataset:
+        cmd += ["--dataset", dataset]
+    if mods:
+        cmd += ["--modalities", *mods]
+    if max_items is not None:                     # ← NEW
+        cmd += ["--max-items", str(max_items)]
+
+    if verbose:
+        print(f"[Preprocess] {' '.join(cmd)}")
+
+    subprocess.run(cmd, check=True)
+
 
 
 class EnhancedMMSCOREvaluator:
@@ -523,6 +535,7 @@ Research Examples:
         run_preprocess(
         dataset=args.dataset or "",
         mods=args.modalities,
+        max_items=args.max_items,  
         verbose=not args.quiet)
             
     # Initialize and run evaluator
